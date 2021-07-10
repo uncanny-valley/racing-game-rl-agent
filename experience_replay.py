@@ -8,8 +8,7 @@ class ExperienceReplay:
         self.max_size = size
         self._memory = collections.deque(maxlen=size)
 
-    @property
-    def size(self):
+    def __len__(self):
         return len(self._memory)
 
     def add_transition(self, state, action, reward, next_state, is_terminal, is_initial_state):
@@ -17,6 +16,8 @@ class ExperienceReplay:
         self._memory.append(t)
 
     def sample_minibatch(self, batch_size):
-        indices = np.random.choice(self.size, batch_size, replace=False)
-        states, actions, rewards, terminals, next_states = zip([self._memory[idx] for idx in indices])
-        return np.array(states), np.array(actions), np.array(rewards, dtype=np.float32), np.array(terminals, dtype=np.uint8), np.array(next_states)
+        indices = np.random.choice(len(self), batch_size, replace=False)
+        states, actions, rewards, next_states, terminals, is_initial_states = zip(*[self._memory[idx] for idx in indices])
+        return np.array(states).reshape(batch_size, 84, 84, 3), np.array(actions), np.array(rewards, dtype=np.float32), \
+                 np.array(terminals, dtype=np.uint8), np.array(next_states).reshape(batch_size, 84, 84, 3), \
+                 np.array(is_initial_states, dtype=np.uint8)

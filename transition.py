@@ -1,9 +1,9 @@
 from collections import namedtuple
 
 Transition = namedtuple('Transition', field_names=[
-    'current_state',
+    'state',
     'action',
     'reward',
-    'is_terminal',
     'next_state',
+    'is_terminal',
     'is_initial_state'])

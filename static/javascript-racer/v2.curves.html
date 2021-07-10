@@ -5,10 +5,12 @@
   <title>Javascript Racer - v2 (curves)</title>
   <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
   <link href="common.css" rel="stylesheet" type="text/css" />
+  <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+  <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
 </head> 
 
 <body> 
-
   <table id="controls">
     <tr>
       <td colspan="2">
@@ -24,9 +26,9 @@
       <td>
         <select id="resolution" style="width:100%">
           <option value='fine'>Fine (1280x960)</option>
-          <option selected value='high'>High (1024x768)</option>
+          <option value='high'>High (1024x768)</option>
           <option value='medium'>Medium (640x480)</option>
-          <option value='low'>Low (480x360)</option>
+          <option selected value='low'>Low (480x360)</option>
         </select>
       </td>
     </tr>
@@ -61,7 +63,24 @@
       <th><label for="fogDensity">Fog Density (<span id="currentFogDensity"></span>) :</label></th>
       <td><input id="fogDensity" type='range' min='0' max='50' title="integer (0-50)"></td>
     </tr>
+    <tr>
+      <td colspan="5">
+        <legend>Select a player:</legend>
+        <fieldset id="player-select-section">
+          <label for="player-agent">Agent</label>
+          <input class="player-select" type="radio" name="player-agent" id="player-agent">
+          <label for="player-human">Human</label>
+          <input class="player-select" type="radio" name="player-agent" id="player-human">
+        </fieldset>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="5">
+        <input style="width:100%" type="submit" value="Play", id="play-button">
+      </td>
+    </tr>
   </table>
+
 
   <div id="racer">
     <canvas id="canvas">
@@ -75,8 +94,8 @@
 
     var fps           = 60;                      // how many 'update' frames per second
     var step          = 1/fps;                   // how long is each frame (in seconds)
-    var width         = 1024;                    // logical canvas width
-    var height        = 768;                     // logical canvas height
+    var width         = 480;                    // logical canvas width
+    var height        = 360;                     // logical canvas height
     var centrifugal   = 0.3;                     // centrifugal force multiplier when going around curves
     var offRoadDecel  = 0.99;                    // speed multiplier when off road (e.g. you lose 2% speed each update frame)
     var skySpeed      = 0.001;                   // background sky layer scroll speed when going around curve (or up hill)
@@ -115,7 +134,7 @@
 
     var keyLeft       = false;
     var keyRight      = false;
-    var keyFaster     = false;
+    var keyFaster     = true;
     var keySlower     = false;
 
     //=========================================================================
@@ -294,26 +313,45 @@
     //=========================================================================
     // THE GAME LOOP
     //=========================================================================
+    $(document).ready(function() {
+      $('.player-select').checkboxradio();
 
-    Game.run({
-      canvas: canvas, render: render, update: update, stats: stats, step: step,
-      images: ["background", "sprites"],
-      keys: [
-        { keys: [KEY.LEFT,  KEY.A], mode: 'down', action: function() { keyLeft   = true;  } },
-        { keys: [KEY.RIGHT, KEY.D], mode: 'down', action: function() { keyRight  = true;  } },
-        { keys: [KEY.UP,    KEY.W], mode: 'down', action: function() { keyFaster = true;  } },
-        { keys: [KEY.DOWN,  KEY.S], mode: 'down', action: function() { keySlower = true;  } },
-        { keys: [KEY.LEFT,  KEY.A], mode: 'up',   action: function() { keyLeft   = false; } },
-        { keys: [KEY.RIGHT, KEY.D], mode: 'up',   action: function() { keyRight  = false; } },
-        { keys: [KEY.UP,    KEY.W], mode: 'up',   action: function() { keyFaster = false; } },
-        { keys: [KEY.DOWN,  KEY.S], mode: 'up',   action: function() { keySlower = false; } }
-      ],
-      ready: function(images) {
-        background = images[0];
-        sprites    = images[1];
-        reset();
+      $('#play-button').click(function(e) {
+        e.preventDefault();
+        const isAgent = $('input[name="player-agent"]:checked').attr('id') == 'player-agent';
+        invokeGame(isAgent);
+      });
+
+      let searchParams = new URLSearchParams(window.location.search);
+      const isAgent = searchParams.has('agent');
+      if (isAgent) {
+        invokeGame(isAgent);
       }
     });
+
+    
+
+    function invokeGame(isAgent) {
+      Game.run({
+        canvas: canvas, render: render, update: update, stats: stats, step: step, isAgent: isAgent,
+        images: ["background", "sprites"],
+        keys: [
+          { keys: [KEY.LEFT,  KEY.A], mode: 'down', action: function() { keyLeft   = true;  } },
+          { keys: [KEY.RIGHT, KEY.D], mode: 'down', action: function() { keyRight  = true;  } },
+          { keys: [KEY.UP,    KEY.W], mode: 'down', action: function() { keyFaster = true;  } },
+          { keys: [KEY.DOWN,  KEY.S], mode: 'down', action: function() { keySlower = true;  } },
+          { keys: [KEY.LEFT,  KEY.A], mode: 'up',   action: function() { keyLeft   = false; } },
+          { keys: [KEY.RIGHT, KEY.D], mode: 'up',   action: function() { keyRight  = false; } },
+          { keys: [KEY.UP,    KEY.W], mode: 'up',   action: function() { keyFaster = false; } },
+          { keys: [KEY.DOWN,  KEY.S], mode: 'up',   action: function() { keySlower = false; } }
+        ],
+        ready: function(images) {
+          background = images[0];
+          sprites    = images[1];
+          reset();
+        }
+      });
+    }
 
     function reset(options) {
       options       = options || {};

@@ -155,21 +155,18 @@ const DOWNSCALED_IMAGE_HEIGHT_IN_PIXELS = 84;
 const DOWNSCALED_IMAGE_WIDTH_IN_PIXELS = 84;
 const ACTION_REPEAT_INTERVAL = 4;
 const metadataBuffer = new FixedSizeBuffer(size=ACTION_REPEAT_INTERVAL);
+const MAX_REQUESTS_PER_EPISODE = 10000;
 
 let IS_INITIAL_FRAME = true;
+let requests_count = 0;
 
-/**
- * Whether the state is considered terminal. States are terminal when
- * the vehicle is off-lane.
- * 
- * @param {number} positionX The x-coordinate of the vehicle
- * @returns true if the state is considered terminal
- */
+
+
 function isTerminalState(positionX) {
-  return Math.abs(positionX) > 0.8;
+  return requests_count > MAX_REQUESTS_PER_EPISODE || Math.abs(positionX) >= 1.0;
 }
 
-function sendFrameData(frame, canvas) {
+function sendFrameData(frame, canvas, isAgent) {
   const metadata = {
     position_x: playerX,
     speed: speed,
@@ -177,7 +174,7 @@ function sendFrameData(frame, canvas) {
   };
 
   const isTerminal = isTerminalState(playerX);
-  if (isTerminal) {
+  if (isTerminal && isAgent) {
     const payload = {
       terminal: isTerminal,
       buffer: [metadata],
@@ -191,7 +188,7 @@ function sendFrameData(frame, canvas) {
             IS_INITIAL_FRAME = false;
           }
           
-          location.reload()
+          window.location.href = window.location.href.replace( /[\?#].*|$/, "?agent" );
         });
     });
 
@@ -208,23 +205,34 @@ function sendFrameData(frame, canvas) {
       is_initial_frame: IS_INITIAL_FRAME
     };
 
-    downscaleFrame(DOWNSCALED_IMAGE_HEIGHT_IN_PIXELS, DOWNSCALED_IMAGE_WIDTH_IN_PIXELS, function(b64) {
-        API.postFrame(payload, b64)
-          .then(response => response.json())
-          .then(function(data) {
-            console.log(data.action);
-            keySlower = data.keys[0];
-            keyFaster = data.keys[1];
-            keyLeft = data.keys[2];
-            keyRight = data.keys[3];
-            requestAnimationFrame(frame, canvas);
-            metadataBuffer.purge();
+    if (!isAgent) {
+      API.getReward(payload)
+        .then(response => response.json())
+        .then(function(data) {
+          console.log(data['reward'], playerX);
+          requestAnimationFrame(frame, canvas);
+          metadataBuffer.purge();
+        });
+    } else {
+      downscaleFrame(DOWNSCALED_IMAGE_HEIGHT_IN_PIXELS, DOWNSCALED_IMAGE_WIDTH_IN_PIXELS, function(b64) {
+          API.postFrame(payload, b64)
+            .then(response => response.json())
+            .then(function(data) {
+              keySlower = data.keys[0];
+              keyFaster = data.keys[1];
+              keyLeft = data.keys[2];
+              keyRight = data.keys[3];
+              requestAnimationFrame(frame, canvas);
+              metadataBuffer.purge();
 
-            if (IS_INITIAL_FRAME) {
-              IS_INITIAL_FRAME = false;
-            }
-          });
-    });
+              if (IS_INITIAL_FRAME) {
+                IS_INITIAL_FRAME = false;
+              }
+
+              requests_count += 1;
+            });
+      });
+    }
   } else {
     requestAnimationFrame(frame, canvas);
   }
@@ -245,6 +253,10 @@ class API {
   static postFrame(metadata, state) {
     return API.postJSON(`/frame?metadata=${JSON.stringify(metadata)}`, state);
   }
+
+  static getReward(metadata) {
+    return API.postJSON(`/reward?metadata=${JSON.stringify(metadata)}`)
+  }
 }
 
 var Game = { 
@@ -257,15 +269,16 @@ var Game = {
 
       Game.setKeyListener(options.keys);
 
-      var canvas = options.canvas,    // canvas render target is provided by caller
-          update = options.update,    // method to update game logic is provided by caller
-          render = options.render,    // method to render the game is provided by caller
-          step   = options.step,      // fixed frame step (1/fps) is specified by caller
-          stats  = options.stats,     // stats instance is provided by caller
-          now    = null,
-          last   = Util.timestamp(),
-          dt     = 0,
-          gdt    = 0;
+      var canvas   = options.canvas,    // canvas render target is provided by caller
+          update   = options.update,    // method to update game logic is provided by caller
+          render   = options.render,    // method to render the game is provided by caller
+          step     = options.step,      // fixed frame step (1/fps) is specified by caller
+          stats    = options.stats,     // stats instance is provided by caller
+          isAgent  = options.isAgent;
+          now      = null,
+          last     = Util.timestamp(),
+          dt       = 0,
+          gdt      = 0;
 
       function frame() {
         now = Util.timestamp();
@@ -278,7 +291,7 @@ var Game = {
         render();
         stats.update();
         last = now;
-        sendFrameData(frame, canvas);
+        sendFrameData(frame, canvas, isAgent);
       }
       frame();
     });

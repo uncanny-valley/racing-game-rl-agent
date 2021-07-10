@@ -1,21 +1,19 @@
 from bidict import bidict
-from enum import Enum, unique
+from enum import IntEnum, unique
 import numpy as np
 
 
 @unique
-class Action(Enum):
+class Action(IntEnum):
     ACCELERATE = 0
     ACCELERATE_LEFT = 1
     ACCELERATE_RIGHT = 2
-    NOTHING = 3
 
     # (down, up, left, right) => action name
     __action_keys_bijective_map__ = bidict({
         (0, 1, 0, 0): ACCELERATE,
         (0, 1, 1, 0): ACCELERATE_LEFT,
-        (0, 1, 0, 1): ACCELERATE_RIGHT,
-        (0, 0, 0, 0): NOTHING
+        (0, 1, 0, 1): ACCELERATE_RIGHT
       })
 
     @classmethod
